@@ -42,6 +42,8 @@ namespace Solnet.Programs
             { Values.InitializeImmutableOwner, "Initialize Immutable Owner" },
             { Values.AmountToUiAmount, "Amount To Ui Amount" },
             { Values.UiAmountToAmount, "Ui Amount To Amount" },
+            { Values.InitializeMintCloseAuthority, "Initialize Mint Close Authority" },
+            { Values.Reallocate, "Reallocate" },
         };
 
         /// <summary>
@@ -186,7 +188,17 @@ namespace Solnet.Programs
             /// Convert a UiAmount of tokens to a little-endian `u64` raw Amount, using the given mint.
             /// In this version of the program, the mint can only specify the number of decimals.
             /// </summary>
-            UiAmountToAmount = 24
+            UiAmountToAmount = 24,
+
+            /// <summary>
+            /// Initialize the Mint Close Authority extension for the given mint.
+            /// </summary>
+            InitializeMintCloseAuthority = 25,
+
+            /// <summary>
+            /// Reallocate an account to include the given extension types.
+            /// </summary>
+            Reallocate = 29
 
         }
     }

@@ -15,6 +15,10 @@ namespace Solnet.Rpc.Builders
     /// </summary>
     public class VersionedMessageBuilder : MessageBuilder
     {
+    /// <summary>
+    /// The version to encode in the message prefix.
+    /// </summary>
+    public byte Version { get; set; }
 
         /// <summary>
         /// Address Table Lookups
@@ -112,7 +116,7 @@ namespace Solnet.Rpc.Builders
             MemoryStream buffer = new MemoryStream(messageBufferSize);
             byte[] messageHeaderBytes = _messageHeader.ToBytes();
 
-            buffer.Write(new byte[] { 128 }, 0, 1);
+            buffer.WriteByte((byte)(0x80 | Version));
             buffer.Write(messageHeaderBytes, 0, messageHeaderBytes.Length);
             buffer.Write(accountAddressesLength, 0, accountAddressesLength.Length);
             buffer.Write(accountKeysBuffer.ToArray(), 0, accountKeysBuffer.ToArray().Length);

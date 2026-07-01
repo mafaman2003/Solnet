@@ -6,6 +6,7 @@ using Solnet.Wallet.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static Solnet.Rpc.Models.Message;
 
 namespace Solnet.Rpc.Test
 {
@@ -111,6 +112,83 @@ namespace Solnet.Rpc.Test
             };
 
             CollectionAssert.AreEqual(msg.Serialize(), MessageBytes);
+        }
+
+        [TestMethod]
+        public void VersionedMessageV0SerializeDeserializeTest()
+        {
+            Message.VersionedMessage.MessageV0 msg = new()
+            {
+                Header = new MessageHeader
+                {
+                    RequiredSignatures = 1,
+                    ReadOnlySignedAccounts = 0,
+                    ReadOnlyUnsignedAccounts = 1
+                },
+                RecentBlockhash = "6dpApBv7syEswXqBMkyHqETN3MGY5x4ZW2cnLzRSSLJ4",
+                AccountKeys = new List<PublicKey>
+                {
+                    new("7y62LXLwANaN9g3KJPxQFYwMxSdZraw5PkqwtqY9zLDF"),
+                    new("11111111111111111111111111111111")
+                },
+                Instructions = new List<CompiledInstruction>
+                {
+                    new()
+                    {
+                        KeyIndices = new byte[] { 0 },
+                        KeyIndicesCount = new byte[] { 1 },
+                        DataLength = new byte[] { 0 },
+                        Data = Array.Empty<byte>(),
+                        ProgramIdIndex = 1
+                    }
+                },
+                AddressTableLookups = new List<MessageAddressTableLookup>
+                {
+                    new()
+                    {
+                        AccountKey = new PublicKey("AddressLookupTab1e1111111111111111111111111"),
+                        WritableIndexes = new byte[] { 0 },
+                        ReadonlyIndexes = new byte[] { 1, 2 }
+                    }
+                }
+            };
+
+            byte[] serialized = msg.Serialize();
+            Message.VersionedMessage deserialized = Message.VersionedMessage.Deserialize(serialized);
+
+            Assert.AreEqual(128, serialized[0]);
+            Assert.AreEqual(0, deserialized.Version);
+            Assert.AreEqual(1, deserialized.AddressTableLookups.Count);
+            Assert.AreEqual("AddressLookupTab1e1111111111111111111111111", deserialized.AddressTableLookups[0].AccountKey.Key);
+            CollectionAssert.AreEqual(new byte[] { 0 }, deserialized.AddressTableLookups[0].WritableIndexes);
+            CollectionAssert.AreEqual(new byte[] { 1, 2 }, deserialized.AddressTableLookups[0].ReadonlyIndexes);
+        }
+
+        [TestMethod]
+        public void VersionedMessageV1SerializeDeserializeTest()
+        {
+            Message.VersionedMessage.MessageV1 msg = new()
+            {
+                Header = new MessageHeader
+                {
+                    RequiredSignatures = 1,
+                    ReadOnlySignedAccounts = 0,
+                    ReadOnlyUnsignedAccounts = 0
+                },
+                RecentBlockhash = "6dpApBv7syEswXqBMkyHqETN3MGY5x4ZW2cnLzRSSLJ4",
+                AccountKeys = new List<PublicKey>
+                {
+                    new("7y62LXLwANaN9g3KJPxQFYwMxSdZraw5PkqwtqY9zLDF")
+                },
+                Instructions = new List<CompiledInstruction>(),
+                AddressTableLookups = new List<MessageAddressTableLookup>()
+            };
+
+            byte[] serialized = msg.Serialize();
+            Message.VersionedMessage deserialized = Message.VersionedMessage.Deserialize(serialized);
+
+            Assert.AreEqual(129, serialized[0]);
+            Assert.AreEqual(1, deserialized.Version);
         }
     }
 }

@@ -113,7 +113,7 @@ namespace Solnet.Rpc.Models
         /// Serialize the message into the wire format.
         /// </summary>
         /// <returns>A byte array corresponding to the serialized message.</returns>
-        public byte[] Serialize()
+        public virtual byte[] Serialize()
         {
             byte[] accountAddressesLength = ShortVectorEncoding.EncodeLength(AccountKeys.Count);
             byte[] instructionsLength = ShortVectorEncoding.EncodeLength(Instructions.Count);
@@ -169,8 +169,7 @@ namespace Solnet.Rpc.Models
 
             // Read account keys
             (int accountAddressLength, int accountAddressLengthEncodedLength) =
-                ShortVectorEncoding.DecodeLength(data.Slice(MessageHeader.Layout.HeaderLength,
-                    ShortVectorEncoding.SpanLength));
+                ShortVectorEncoding.DecodeLength(GetShortVectorSpan(data, MessageHeader.Layout.HeaderLength));
             List<PublicKey> accountKeys = new(accountAddressLength);
             for (int i = 0; i < accountAddressLength; i++)
             {
@@ -191,10 +190,10 @@ namespace Solnet.Rpc.Models
             // Read the number of instructions in the message
             (int instructionsLength, int instructionsLengthEncodedLength) =
                 ShortVectorEncoding.DecodeLength(
-                    data.Slice(
+                    GetShortVectorSpan(
+                        data,
                         MessageHeader.Layout.HeaderLength + accountAddressLengthEncodedLength +
-                        (accountAddressLength * PublicKey.PublicKeyLength) + PublicKey.PublicKeyLength,
-                        ShortVectorEncoding.SpanLength));
+                        (accountAddressLength * PublicKey.PublicKeyLength) + PublicKey.PublicKeyLength));
 
             List<CompiledInstruction> instructions = new(instructionsLength);
             int instructionsOffset =
@@ -262,9 +261,58 @@ namespace Solnet.Rpc.Models
             public const byte VersionPrefixMask = 0x7F;
 
             /// <summary>
+            /// The message version encoded in the low 7 bits of the versioned prefix.
+            /// </summary>
+            public byte Version { get; set; }
+
+            /// <summary>
             /// Address table lookup
             /// </summary>
             public List<MessageAddressTableLookup> AddressTableLookups { get; set; }
+
+            /// <summary>
+            /// Serialize the versioned message into the wire format.
+            /// </summary>
+            /// <returns>A byte array corresponding to the serialized versioned message.</returns>
+            public override byte[] Serialize()
+            {
+                byte[] accountAddressesLength = ShortVectorEncoding.EncodeLength(AccountKeys.Count);
+                byte[] instructionsLength = ShortVectorEncoding.EncodeLength(Instructions.Count);
+                int accountKeysBufferSize = AccountKeys.Count * PublicKey.PublicKeyLength;
+
+                MemoryStream accountKeysBuffer = new(accountKeysBufferSize);
+
+                foreach (PublicKey key in AccountKeys)
+                {
+                    accountKeysBuffer.Write(key.KeyBytes);
+                }
+
+                byte[] addressTableLookupBytes = AddressTableLookupUtils.SerializeAddressTableLookups(AddressTableLookups);
+                int messageBufferSize = 1 + MessageHeader.Layout.HeaderLength + PublicKey.PublicKeyLength +
+                                        accountAddressesLength.Length + instructionsLength.Length + Instructions.Count +
+                                        accountKeysBufferSize + addressTableLookupBytes.Length;
+                MemoryStream buffer = new(messageBufferSize);
+                byte[] messageHeaderBytes = Header.ToBytes();
+
+                buffer.WriteByte((byte)(0x80 | Version));
+                buffer.Write(messageHeaderBytes);
+                buffer.Write(accountAddressesLength);
+                buffer.Write(accountKeysBuffer.ToArray());
+                buffer.Write(Encoders.Base58.DecodeData(RecentBlockhash));
+                buffer.Write(instructionsLength);
+
+                foreach (CompiledInstruction compiledInstruction in Instructions)
+                {
+                    buffer.WriteByte(compiledInstruction.ProgramIdIndex);
+                    buffer.Write(compiledInstruction.KeyIndicesCount);
+                    buffer.Write(compiledInstruction.KeyIndices);
+                    buffer.Write(compiledInstruction.DataLength);
+                    buffer.Write(compiledInstruction.Data);
+                }
+
+                buffer.Write(addressTableLookupBytes);
+                return buffer.ToArray();
+            }
 
 
             /// <summary>
@@ -282,9 +330,6 @@ namespace Solnet.Rpc.Models
 
                 byte version = maskedPrefix;
 
-                if (version != 0)
-                    throw new NotSupportedException($"Expected versioned message with version 0 but found version {version}");
-
                 data = data.Slice(1, data.Length - 1); // Remove the processed prefix byte
 
                 // Read message header
@@ -294,8 +339,7 @@ namespace Solnet.Rpc.Models
 
                 // Read account keys
                 (int accountAddressLength, int accountAddressLengthEncodedLength) =
-                    ShortVectorEncoding.DecodeLength(data.Slice(MessageHeader.Layout.HeaderLength,
-                        ShortVectorEncoding.SpanLength));
+                    ShortVectorEncoding.DecodeLength(GetShortVectorSpan(data, MessageHeader.Layout.HeaderLength));
                 List<PublicKey> accountKeys = new(accountAddressLength);
                 for (int i = 0; i < accountAddressLength; i++)
                 {
@@ -316,10 +360,10 @@ namespace Solnet.Rpc.Models
                 // Read the number of instructions in the message
                 (int instructionsLength, int instructionsLengthEncodedLength) =
                     ShortVectorEncoding.DecodeLength(
-                        data.Slice(
+                        GetShortVectorSpan(
+                            data,
                             MessageHeader.Layout.HeaderLength + accountAddressLengthEncodedLength +
-                            (accountAddressLength * PublicKey.PublicKeyLength) + PublicKey.PublicKeyLength,
-                            ShortVectorEncoding.SpanLength));
+                            (accountAddressLength * PublicKey.PublicKeyLength) + PublicKey.PublicKeyLength));
 
                 List<CompiledInstruction> instructions = new(instructionsLength);
                 int instructionsOffset =
@@ -346,10 +390,28 @@ namespace Solnet.Rpc.Models
                     (accountAddressLength * PublicKey.PublicKeyLength) + PublicKey.PublicKeyLength +
                     instructionsLengthEncodedLength + instructionsDataLength;
 
+                List<MessageAddressTableLookup> addressTableLookups = new();
+                if (tableLookupOffset >= data.Length)
+                {
+                    return new VersionedMessage()
+                    {
+                        Version = version,
+                        Header = new MessageHeader()
+                        {
+                            RequiredSignatures = numRequiredSignatures,
+                            ReadOnlySignedAccounts = numReadOnlySignedAccounts,
+                            ReadOnlyUnsignedAccounts = numReadOnlyUnsignedAccounts
+                        },
+                        RecentBlockhash = blockHash,
+                        AccountKeys = accountKeys,
+                        Instructions = instructions,
+                        AddressTableLookups = addressTableLookups
+                    };
+                }
+
                 ReadOnlySpan<byte> tableLookupData = data[tableLookupOffset..];
 
                 (int addressTableLookupsCount, int addressTableLookupsEncodedCount) = ShortVectorEncoding.DecodeLength(tableLookupData);
-                List<MessageAddressTableLookup> addressTableLookups = new();
                 tableLookupData = tableLookupData[addressTableLookupsEncodedCount..];
 
                 for (int i = 0; i < addressTableLookupsCount; i++)
@@ -376,6 +438,7 @@ namespace Solnet.Rpc.Models
 
                 return new VersionedMessage()
                 {
+                    Version = version,
                     Header = new MessageHeader()
                     {
                         RequiredSignatures = numRequiredSignatures,
@@ -433,6 +496,34 @@ namespace Solnet.Rpc.Models
                 // The lower 7 bits of the prefix indicate the message version
                 return maskedPrefix.ToString();
             }
+
+            /// <summary>
+            /// Represents a version 0 message.
+            /// </summary>
+            public class MessageV0 : VersionedMessage
+            {
+                /// <summary>
+                /// Initializes a version 0 message.
+                /// </summary>
+                public MessageV0()
+                {
+                    Version = 0;
+                }
+            }
+
+            /// <summary>
+            /// Represents a version 1 message.
+            /// </summary>
+            public class MessageV1 : VersionedMessage
+            {
+                /// <summary>
+                /// Initializes a version 1 message.
+                /// </summary>
+                public MessageV1()
+                {
+                    Version = 1;
+                }
+            }
         }
 
         /// <summary>
@@ -468,6 +559,8 @@ namespace Solnet.Rpc.Models
             /// <returns></returns>
             public static byte[] SerializeAddressTableLookups(List<MessageAddressTableLookup> addressTableLookups)
             {
+                addressTableLookups ??= new List<MessageAddressTableLookup>();
+
                 MemoryStream buffer = new();
 
                 var encodedAddressTableLookupsLength = ShortVectorEncoding.EncodeLength(addressTableLookups.Count);
@@ -491,6 +584,14 @@ namespace Solnet.Rpc.Models
 
                 return buffer.ToArray();
             }
+        }
+
+        private static ReadOnlySpan<byte> GetShortVectorSpan(ReadOnlySpan<byte> data, int offset)
+        {
+            int remaining = data.Length - offset;
+            return remaining <= ShortVectorEncoding.SpanLength
+                ? data.Slice(offset, remaining)
+                : data.Slice(offset, ShortVectorEncoding.SpanLength);
         }
     }
 }

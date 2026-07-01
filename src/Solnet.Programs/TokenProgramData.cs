@@ -2,6 +2,8 @@ using Solnet.Programs.Utilities;
 using Solnet.Wallet;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 
 namespace Solnet.Programs
 {
@@ -176,6 +178,149 @@ namespace Solnet.Programs
         /// <returns>The byte array with the encoded data.</returns>
         internal static byte[] EncodeSyncNativeData() =>
             new[] { (byte) TokenProgramInstructions.Values.SyncNative };
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.InitializeAccount2"/> method.
+        /// </summary>
+        /// <param name="owner">The owner public key.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeInitializeAccount2Data(PublicKey owner)
+            => EncodeInitializeAccountOwnerData((byte)TokenProgramInstructions.Values.InitializeAccount2, owner);
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.InitializeAccount3"/> method.
+        /// </summary>
+        /// <param name="owner">The owner public key.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeInitializeAccount3Data(PublicKey owner)
+            => EncodeInitializeAccountOwnerData((byte)TokenProgramInstructions.Values.InitializeAccount3, owner);
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.InitializeMultiSignature2"/> method.
+        /// </summary>
+        /// <param name="m">The number of required signers.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeInitializeMultiSignature2Data(int m)
+        {
+            byte[] methodBuffer = new byte[2];
+
+            methodBuffer.WriteU8((byte)TokenProgramInstructions.Values.InitializeMultiSignature2, MethodOffset);
+            methodBuffer.WriteU8((byte)m, 1);
+
+            return methodBuffer;
+        }
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.InitializeMint2"/> method.
+        /// </summary>
+        /// <param name="mintAuthority">The mint authority.</param>
+        /// <param name="freezeAuthority">The freeze authority.</param>
+        /// <param name="decimals">The number of decimals.</param>
+        /// <param name="freezeAuthorityOption">The freeze authority option.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeInitializeMint2Data(
+            PublicKey mintAuthority, PublicKey freezeAuthority, int decimals, int freezeAuthorityOption)
+        {
+            byte[] methodBuffer = new byte[67];
+
+            methodBuffer.WriteU8((byte)TokenProgramInstructions.Values.InitializeMint2, MethodOffset);
+            methodBuffer.WriteU8((byte)decimals, 1);
+            methodBuffer.WritePubKey(mintAuthority, 2);
+            methodBuffer.WriteU8((byte)freezeAuthorityOption, 34);
+            methodBuffer.WritePubKey(freezeAuthority, 35);
+
+            return methodBuffer;
+        }
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.GetAccountDataSize"/> method.
+        /// </summary>
+        /// <param name="extensionTypes">The extension types to include.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeGetAccountDataSizeData(IEnumerable<Token2022ExtensionType> extensionTypes)
+        {
+            Token2022ExtensionType[] extensions = extensionTypes?.ToArray() ?? Array.Empty<Token2022ExtensionType>();
+            byte[] methodBuffer = new byte[1 + extensions.Length * 2];
+
+            methodBuffer.WriteU8((byte)TokenProgramInstructions.Values.GetAccountDataSize, MethodOffset);
+
+            for (int i = 0; i < extensions.Length; i++)
+            {
+                methodBuffer.WriteU16((ushort)extensions[i], 1 + i * 2);
+            }
+
+            return methodBuffer;
+        }
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.InitializeImmutableOwner"/> method.
+        /// </summary>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeInitializeImmutableOwnerData()
+            => new[] { (byte)TokenProgramInstructions.Values.InitializeImmutableOwner };
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.AmountToUiAmount"/> method.
+        /// </summary>
+        /// <param name="amount">The amount.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeAmountToUiAmountData(ulong amount)
+            => EncodeAmountLayout((byte)TokenProgramInstructions.Values.AmountToUiAmount, amount);
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.UiAmountToAmount"/> method.
+        /// </summary>
+        /// <param name="uiAmount">The ui amount string.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeUiAmountToAmountData(string uiAmount)
+        {
+            byte[] uiAmountBytes = Encoding.UTF8.GetBytes(uiAmount);
+            byte[] methodBuffer = new byte[1 + uiAmountBytes.Length];
+
+            methodBuffer.WriteU8((byte)TokenProgramInstructions.Values.UiAmountToAmount, MethodOffset);
+            Array.Copy(uiAmountBytes, 0, methodBuffer, 1, uiAmountBytes.Length);
+
+            return methodBuffer;
+        }
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.InitializeMintCloseAuthority"/> method.
+        /// </summary>
+        /// <param name="closeAuthority">The close authority, if present.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeInitializeMintCloseAuthorityData(PublicKey closeAuthority)
+        {
+            if (closeAuthority == null)
+            {
+                return new[] { (byte)TokenProgramInstructions.Values.InitializeMintCloseAuthority, (byte)0 };
+            }
+
+            byte[] methodBuffer = new byte[34];
+            methodBuffer.WriteU8((byte)TokenProgramInstructions.Values.InitializeMintCloseAuthority, MethodOffset);
+            methodBuffer.WriteU8(1, 1);
+            methodBuffer.WritePubKey(closeAuthority, 2);
+            return methodBuffer;
+        }
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the <see cref="TokenProgramInstructions.Values.Reallocate"/> method.
+        /// </summary>
+        /// <param name="extensionTypes">The extension types to include.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        internal static byte[] EncodeReallocateData(IEnumerable<Token2022ExtensionType> extensionTypes)
+        {
+            Token2022ExtensionType[] extensions = extensionTypes?.ToArray() ?? Array.Empty<Token2022ExtensionType>();
+            byte[] methodBuffer = new byte[1 + extensions.Length * 2];
+
+            methodBuffer.WriteU8((byte)TokenProgramInstructions.Values.Reallocate, MethodOffset);
+
+            for (int i = 0; i < extensions.Length; i++)
+            {
+                methodBuffer.WriteU16((ushort)extensions[i], 1 + i * 2);
+            }
+
+            return methodBuffer;
+        }
 
         /// <summary>
         /// Decodes the instruction instruction data  for the <see cref="TokenProgramInstructions.Values.InitializeMint"/> method
@@ -633,7 +778,7 @@ namespace Solnet.Programs
             IList<PublicKey> keys, byte[] keyIndices)
         {
             decodedInstruction.Values.Add("Mint", keys[keyIndices[0]]);
-            decodedInstruction.Values.Add("Amount", data.DecodeBincodeString(1).EncodedString);
+            decodedInstruction.Values.Add("Amount", Encoding.UTF8.GetString(data[1..]));
         }
 
         /// <summary>
@@ -647,6 +792,18 @@ namespace Solnet.Programs
             IList<PublicKey> keys, byte[] keyIndices)
         {
             decodedInstruction.Values.Add("Mint", keys[keyIndices[0]]);
+            List<Token2022ExtensionType> extensions = new();
+
+            for (int offset = 1; offset + 1 < data.Length; offset += 2)
+            {
+                ushort value = data.GetU16(offset);
+                if (Enum.IsDefined(typeof(Token2022ExtensionType), value))
+                {
+                    extensions.Add((Token2022ExtensionType)value);
+                }
+            }
+
+            decodedInstruction.Values.Add("Extension Types", extensions);
         }
 
         /// <summary>
@@ -660,6 +817,60 @@ namespace Solnet.Programs
             IList<PublicKey> keys, byte[] keyIndices)
         {
             decodedInstruction.Values.Add("Account", keys[keyIndices[0]]);
+        }
+
+        /// <summary>
+        /// Decodes the instruction data for the <see cref="TokenProgramInstructions.Values.InitializeMintCloseAuthority"/> method.
+        /// </summary>
+        internal static void DecodeInitializeMintCloseAuthority(DecodedInstruction decodedInstruction, ReadOnlySpan<byte> data,
+            IList<PublicKey> keys, byte[] keyIndices)
+        {
+            decodedInstruction.Values.Add("Mint", keys[keyIndices[0]]);
+            bool hasCloseAuthority = data.Length > 1 && data.GetU8(1) == 1;
+            decodedInstruction.Values.Add("Close Authority Option", hasCloseAuthority);
+            if (hasCloseAuthority)
+            {
+                decodedInstruction.Values.Add("Close Authority", data.GetPubKey(2));
+            }
+        }
+
+        /// <summary>
+        /// Decodes the instruction data for the <see cref="TokenProgramInstructions.Values.Reallocate"/> method.
+        /// </summary>
+        internal static void DecodeReallocate(DecodedInstruction decodedInstruction, ReadOnlySpan<byte> data,
+            IList<PublicKey> keys, byte[] keyIndices)
+        {
+            decodedInstruction.Values.Add("Account", keys[keyIndices[0]]);
+            decodedInstruction.Values.Add("Payer", keys[keyIndices[1]]);
+            decodedInstruction.Values.Add("Owner", keys[keyIndices[3]]);
+
+            List<Token2022ExtensionType> extensions = new();
+            for (int offset = 1; offset + 1 < data.Length; offset += 2)
+            {
+                ushort value = data.GetU16(offset);
+                if (Enum.IsDefined(typeof(Token2022ExtensionType), value))
+                {
+                    extensions.Add((Token2022ExtensionType)value);
+                }
+            }
+
+            decodedInstruction.Values.Add("Extension Types", extensions);
+        }
+
+        /// <summary>
+        /// Encodes the transaction instruction data for the methods that require only an owner public key.
+        /// </summary>
+        /// <param name="method">The method identifier.</param>
+        /// <param name="owner">The owner public key.</param>
+        /// <returns>The byte array with the encoded data.</returns>
+        private static byte[] EncodeInitializeAccountOwnerData(byte method, PublicKey owner)
+        {
+            byte[] methodBuffer = new byte[33];
+
+            methodBuffer.WriteU8(method, MethodOffset);
+            methodBuffer.WritePubKey(owner, 1);
+
+            return methodBuffer;
         }
     }
 }

@@ -19,7 +19,7 @@ namespace Solnet.Programs
         /// <summary>
         /// Represents the instruction types for the <see cref="AddressLookupTableProgram"/>.
         /// </summary>
-        internal enum Values : byte
+        internal enum Values : uint
         {
             CreateLookupTable = 0,
             FreezeLookupTable = 1,

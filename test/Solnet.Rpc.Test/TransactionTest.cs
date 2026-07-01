@@ -6,6 +6,7 @@ using Solnet.Wallet;
 using Solnet.Wallet.Utilities;
 using System;
 using System.Collections.Generic;
+using static Solnet.Rpc.Models.Message;
 
 namespace Solnet.Rpc.Test
 {
@@ -346,6 +347,67 @@ namespace Solnet.Rpc.Test
             byte[] serializedBytes = tx.Serialize();
             
             CollectionAssert.AreEqual(CraftTransactionBytes, serializedBytes);
+        }
+
+        [TestMethod]
+        public void VersionedTransactionCompileMessageV0WithAddressLookupTableTest()
+        {
+            Wallet.Wallet wallet = new(MnemonicWords);
+            Account ownerAccount = wallet.GetAccount(10);
+            Account recipientAccount = wallet.GetAccount(11);
+
+            VersionedTransaction tx = new()
+            {
+                FeePayer = ownerAccount,
+                RecentBlockHash = "6dpApBv7syEswXqBMkyHqETN3MGY5x4ZW2cnLzRSSLJ4",
+                Instructions = new List<TransactionInstruction>
+                {
+                    MemoProgram.NewMemo(ownerAccount, "v0 alt")
+                },
+                AddressTableLookups = new List<MessageAddressTableLookup>
+                {
+                    new()
+                    {
+                        AccountKey = AddressLookupTableProgram.ProgramIdKey,
+                        WritableIndexes = new byte[] { 0 },
+                        ReadonlyIndexes = new byte[] { 1, 2, 3 }
+                    }
+                }
+            };
+
+            byte[] compiled = tx.CompileMessage();
+            Message.VersionedMessage msg = Message.VersionedMessage.Deserialize(compiled);
+
+            Assert.AreEqual(128, compiled[0]);
+            Assert.AreEqual(0, msg.Version);
+            Assert.AreEqual(1, msg.AddressTableLookups.Count);
+            CollectionAssert.AreEqual(new byte[] { 0 }, msg.AddressTableLookups[0].WritableIndexes);
+            CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, msg.AddressTableLookups[0].ReadonlyIndexes);
+        }
+
+        [TestMethod]
+        public void VersionedTransactionCompileMessageV1Test()
+        {
+            Wallet.Wallet wallet = new(MnemonicWords);
+            Account ownerAccount = wallet.GetAccount(10);
+
+            VersionedTransaction tx = new()
+            {
+                Version = 1,
+                FeePayer = ownerAccount,
+                RecentBlockHash = "6dpApBv7syEswXqBMkyHqETN3MGY5x4ZW2cnLzRSSLJ4",
+                Instructions = new List<TransactionInstruction>
+                {
+                    MemoProgram.NewMemo(ownerAccount, "v1")
+                },
+                AddressTableLookups = new List<MessageAddressTableLookup>()
+            };
+
+            byte[] compiled = tx.CompileMessage();
+            Message.VersionedMessage msg = Message.VersionedMessage.Deserialize(compiled);
+
+            Assert.AreEqual(129, compiled[0]);
+            Assert.AreEqual(1, msg.Version);
         }
     }
 }

@@ -20,13 +20,23 @@ namespace Solnet.Rpc.Models
         /// </summary>
         public List<MessageAddressTableLookup> AddressTableLookups { get; set; }
 
+    /// <summary>
+    /// The message version to use when compiling the versioned transaction.
+    /// </summary>
+    public byte Version { get; set; }
+
 
         /// <summary>
         /// Compile the transaction data.
         /// </summary>
         public override byte[] CompileMessage()
         {
-            VersionedMessageBuilder messageBuilder = new() { FeePayer = FeePayer, AccountKeys = _accountKeys };
+            VersionedMessageBuilder messageBuilder = new()
+            {
+                FeePayer = FeePayer,
+                AccountKeys = _accountKeys,
+                Version = Version
+            };
 
             if (RecentBlockHash != null) messageBuilder.RecentBlockHash = RecentBlockHash;
             if (NonceInformation != null) messageBuilder.NonceInformation = NonceInformation;

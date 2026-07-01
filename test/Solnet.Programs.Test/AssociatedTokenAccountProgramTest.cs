@@ -36,5 +36,30 @@ namespace Solnet.Programs.Test
             CollectionAssert.AreEqual(ProgramIdBytes, txInstruction.ProgramId);
             CollectionAssert.AreEqual(System.Array.Empty<byte>(), txInstruction.Data);
         }
+
+        [TestMethod]
+        public void CreateAssociatedTokenAccountForToken2022Test()
+        {
+            var wallet = new Wallet.Wallet(MnemonicWords);
+
+            var ownerAccount = wallet.GetAccount(10);
+            var mintAccount = wallet.GetAccount(21);
+
+            var txInstruction = AssociatedTokenAccountProgram.CreateAssociatedTokenAccount(
+                ownerAccount,
+                ownerAccount.PublicKey,
+                mintAccount.PublicKey,
+                Token2022Program.ProgramIdKey);
+
+            Assert.AreEqual(Token2022Program.ProgramIdKey, txInstruction.Keys[5].PublicKey);
+
+            var legacyAta = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(ownerAccount.PublicKey, mintAccount.PublicKey);
+            var token2022Ata = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(
+                ownerAccount.PublicKey,
+                mintAccount.PublicKey,
+                Token2022Program.ProgramIdKey);
+
+            Assert.AreNotEqual(legacyAta, token2022Ata);
+        }
     }
 }

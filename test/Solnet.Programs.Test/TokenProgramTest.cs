@@ -352,6 +352,47 @@ namespace Solnet.Programs.Test
         }
 
         [TestMethod]
+        public void TestInitializeAccount2And3AndMint2()
+        {
+            var wallet = new Wallet.Wallet(MnemonicWords);
+
+            var mintAccount = wallet.GetAccount(21);
+            var ownerAccount = wallet.GetAccount(10);
+            var initialAccount = wallet.GetAccount(22);
+
+            var initializeAccount2 = TokenProgram.InitializeAccount2(
+                initialAccount.PublicKey,
+                mintAccount.PublicKey,
+                ownerAccount.PublicKey);
+
+            Assert.AreEqual(3, initializeAccount2.Keys.Count);
+            CollectionAssert.AreEqual(TokenProgramIdBytes, initializeAccount2.ProgramId);
+            Assert.AreEqual(16, initializeAccount2.Data[0]);
+            CollectionAssert.AreEqual(ownerAccount.PublicKey.KeyBytes, initializeAccount2.Data[1..33]);
+
+            var initializeAccount3 = TokenProgram.InitializeAccount3(
+                initialAccount.PublicKey,
+                mintAccount.PublicKey,
+                ownerAccount.PublicKey);
+
+            Assert.AreEqual(2, initializeAccount3.Keys.Count);
+            CollectionAssert.AreEqual(TokenProgramIdBytes, initializeAccount3.ProgramId);
+            Assert.AreEqual(18, initializeAccount3.Data[0]);
+            CollectionAssert.AreEqual(ownerAccount.PublicKey.KeyBytes, initializeAccount3.Data[1..33]);
+
+            var initializeMint2 = TokenProgram.InitializeMint2(
+                mintAccount.PublicKey,
+                2,
+                ownerAccount.PublicKey,
+                ownerAccount.PublicKey);
+
+            Assert.AreEqual(1, initializeMint2.Keys.Count);
+            CollectionAssert.AreEqual(TokenProgramIdBytes, initializeMint2.ProgramId);
+            Assert.AreEqual(20, initializeMint2.Data[0]);
+            CollectionAssert.AreEqual(ExpectedInitializeMintData[1..], initializeMint2.Data[1..]);
+        }
+
+        [TestMethod]
         public void TestInitializeMultisig()
         {
             var wallet = new Wallet.Wallet(MnemonicWords);

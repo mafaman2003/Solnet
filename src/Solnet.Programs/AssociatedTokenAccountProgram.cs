@@ -40,7 +40,22 @@ namespace Solnet.Programs
         /// <returns>The transaction instruction, returns null whenever an associated token address could not be derived..</returns>
         public static TransactionInstruction CreateAssociatedTokenAccount(PublicKey payer, PublicKey owner, PublicKey mint)
         {
-            PublicKey associatedTokenAddress = DeriveAssociatedTokenAccount(owner, mint);
+            return CreateAssociatedTokenAccount(payer, owner, mint, TokenProgram.ProgramIdKey);
+        }
+
+        /// <summary>
+        /// Initialize a new transaction which interacts with the Associated Token Account Program to create
+        /// a new associated token account.
+        /// </summary>
+        /// <param name="payer">The public key of the account used to fund the associated token account.</param>
+        /// <param name="owner">The public key of the owner account for the new associated token account.</param>
+        /// <param name="mint">The public key of the mint for the new associated token account.</param>
+        /// <param name="tokenProgramId">The token program id associated with the mint.</param>
+        /// <returns>The transaction instruction, returns null whenever an associated token address could not be derived..</returns>
+        public static TransactionInstruction CreateAssociatedTokenAccount(
+            PublicKey payer, PublicKey owner, PublicKey mint, PublicKey tokenProgramId)
+        {
+            PublicKey associatedTokenAddress = DeriveAssociatedTokenAccount(owner, mint, tokenProgramId);
 
             if (associatedTokenAddress == null) return null;
 
@@ -51,7 +66,7 @@ namespace Solnet.Programs
                 AccountMeta.ReadOnly(owner, false),
                 AccountMeta.ReadOnly(mint, false),
                 AccountMeta.ReadOnly(SystemProgram.ProgramIdKey, false),
-                AccountMeta.ReadOnly(TokenProgram.ProgramIdKey, false),
+                AccountMeta.ReadOnly(tokenProgramId, false),
                 AccountMeta.ReadOnly(SysVars.RentKey, false)
             };
 
@@ -71,8 +86,20 @@ namespace Solnet.Programs
         /// <returns>The public key of the associated token account if it could be found, otherwise null.</returns>
         public static PublicKey DeriveAssociatedTokenAccount(PublicKey owner, PublicKey mint)
         {
+            return DeriveAssociatedTokenAccount(owner, mint, TokenProgram.ProgramIdKey);
+        }
+
+        /// <summary>
+        /// Derive the public key of the associated token account for the given owner, mint, and token program.
+        /// </summary>
+        /// <param name="owner">The public key of the owner account for the new associated token account.</param>
+        /// <param name="mint">The public key of the mint for the new associated token account.</param>
+        /// <param name="tokenProgramId">The token program id associated with the mint.</param>
+        /// <returns>The public key of the associated token account if it could be found, otherwise null.</returns>
+        public static PublicKey DeriveAssociatedTokenAccount(PublicKey owner, PublicKey mint, PublicKey tokenProgramId)
+        {
             bool success = PublicKey.TryFindProgramAddress(
-                new List<byte[]> { owner.KeyBytes, TokenProgram.ProgramIdKey.KeyBytes, mint.KeyBytes },
+                new List<byte[]> { owner.KeyBytes, tokenProgramId.KeyBytes, mint.KeyBytes },
                 ProgramIdKey, out PublicKey derivedAssociatedTokenAddress, out _);
             return derivedAssociatedTokenAddress;
         }

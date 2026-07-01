@@ -40,6 +40,8 @@ namespace Solnet.Programs
             InstructionDictionary.Add(SharedMemoryProgram.ProgramIdKey, SharedMemoryProgram.Decode);
             InstructionDictionary.Add(StakeProgram.ProgramIdKey, StakeProgram.Decode);
             InstructionDictionary.Add(AccountCompressionProgram.ProgramIdKey, AccountCompressionProgram.Decode);
+            InstructionDictionary.Add(AddressLookupTableProgram.ProgramIdKey, AddressLookupTableProgram.Decode);
+            InstructionDictionary.Add(Token2022Program.ProgramIdKey, Token2022Program.Decode);
         }
 
         /// <summary>

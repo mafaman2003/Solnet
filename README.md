@@ -398,6 +398,71 @@ byte[] txBytes = new TransactionBuilder()
 string signature = rpcClient.SendTransaction(txBytes);
 ```
 
+### Creating and extending an Address Lookup Table for a complex transaction
+```csharp
+var rpcClient = ClientFactory.GetClient(Cluster.MainNet);
+var wallet = new Wallet("mnemonic words ...", WordList.English);
+
+var authorityAccount = wallet.GetAccount(0);
+var payerAccount = authorityAccount;
+
+// ALT creation depends on a recent slot and derives the lookup table PDA from
+// authority + recentSlot.
+ulong recentSlot = rpcClient.GetSlot().Result;
+PublicKey lookupTableAddress = AddressLookupTableProgram.DeriveLookupTableAddress(
+    authorityAccount.PublicKey,
+    recentSlot);
+
+var createBlockHash = rpcClient.GetLatestBlockHash();
+byte[] createAltTx = new TransactionBuilder()
+    .SetRecentBlockHash(createBlockHash.Result.Value.Blockhash)
+    .SetFeePayer(payerAccount)
+    .AddInstruction(ComputeBudgetProgram.SetComputeUnitLimit(60000))
+    .AddInstruction(ComputeBudgetProgram.SetComputeUnitPrice(1000000))
+    .AddInstruction(AddressLookupTableProgram.CreateLookupTable(
+        authorityAccount.PublicKey,
+        payerAccount.PublicKey,
+        recentSlot))
+    .Build(payerAccount);
+
+string createAltSignature = rpcClient.SendTransaction(createAltTx).Result;
+
+// Wait for confirmation before extending or consuming the table in a v0 transaction.
+List<PublicKey> addressesToCache = new()
+{
+    TokenProgram.ProgramIdKey,
+    SystemProgram.ProgramIdKey,
+    new PublicKey("So11111111111111111111111111111111111111112"),
+    new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
+};
+
+var extendBlockHash = rpcClient.GetLatestBlockHash();
+byte[] extendAltTx = new TransactionBuilder()
+    .SetRecentBlockHash(extendBlockHash.Result.Value.Blockhash)
+    .SetFeePayer(payerAccount)
+    .AddInstruction(ComputeBudgetProgram.SetComputeUnitLimit(60000))
+    .AddInstruction(ComputeBudgetProgram.SetComputeUnitPrice(1000000))
+    .AddInstruction(AddressLookupTableProgram.ExtendLookupTable(
+        lookupTableAddress,
+        authorityAccount.PublicKey,
+        payerAccount.PublicKey,
+        addressesToCache))
+    .Build(payerAccount);
+
+string extendAltSignature = rpcClient.SendTransaction(extendAltTx).Result;
+
+// Once confirmed, the table can be referenced from a v0 transaction through
+// VersionedTransaction.AddressTableLookups and MessageAddressTableLookup.
+var lookupReference = new Message.MessageAddressTableLookup
+{
+    AccountKey = lookupTableAddress,
+    WritableIndexes = System.Array.Empty<byte>(),
+    ReadonlyIndexes = new byte[] { 0, 1, 2, 3 }
+};
+```
+
+This pattern is useful when a later transaction needs more account addresses than fit comfortably in the legacy message format. In Solnet, you typically create and populate the ALT with `TransactionBuilder`, wait for confirmation, and then reference it from a `VersionedTransaction` when building the larger v0 message.
+
 ### Instruction decoding
 ```csharp
 var msg = Message.Deserialize(msgBase64);

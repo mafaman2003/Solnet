@@ -1,12 +1,15 @@
 using System.Collections.Generic;
 using Solnet.Programs.Utilities;
 using Solnet.Wallet;
+using System;
 
 namespace Solnet.Programs
 {
     internal static class AddressLookupTableProgramData
     {
         internal const int MethodOffset = 0;
+        internal const int ExtendLookupTableAddressesLengthOffset = 4;
+        internal const int ExtendLookupTableAddressesOffset = 12;
 
         /// <summary>
         /// Encode transaction instruction data for the <see cref="AddressLookupTableProgramInstruction.Values.CreateLookupTable"/> method.
@@ -73,6 +76,24 @@ namespace Solnet.Programs
             byte[] data = new byte[4];
             data.WriteU32((uint)AddressLookupTableProgramInstruction.Values.CloseLookupTable, MethodOffset);
             return data;
+        }
+
+        /// <summary>
+        /// Decode the addresses carried by an extend lookup table instruction.
+        /// </summary>
+        /// <param name="data">The instruction data.</param>
+        /// <returns>The list of addresses carried by the instruction.</returns>
+        internal static List<PublicKey> DecodeExtendLookupTableAddresses(ReadOnlySpan<byte> data)
+        {
+            ulong keyCount = data.GetU64(ExtendLookupTableAddressesLengthOffset);
+            List<PublicKey> addresses = new((int)keyCount);
+
+            for (int i = 0; i < (int)keyCount; i++)
+            {
+                addresses.Add(data.GetPubKey(ExtendLookupTableAddressesOffset + i * PublicKey.PublicKeyLength));
+            }
+
+            return addresses;
         }
     }
 }

@@ -141,6 +141,57 @@ namespace Solnet.Programs
         }
 
         /// <summary>
+        /// <para>Initializes an instruction to initialize a new account to hold tokens.</para>
+        /// <para>
+        /// This variant differs from <see cref="InitializeAccount"/> in that the owner does not need to be passed as an account.
+        /// </para>
+        /// </summary>
+        /// <param name="account">The public key of the account to initialize.</param>
+        /// <param name="mint">The public key of the token mint.</param>
+        /// <param name="authority">The public key of the account to set as authority of the initialized account.</param>
+        /// <returns>The transaction instruction.</returns>
+        public static TransactionInstruction InitializeAccount2(PublicKey account, PublicKey mint, PublicKey authority)
+        {
+            List<AccountMeta> keys = new()
+            {
+                AccountMeta.Writable(account, false),
+                AccountMeta.ReadOnly(mint, false),
+                AccountMeta.ReadOnly(SysVars.RentKey, false)
+            };
+            return new TransactionInstruction
+            {
+                ProgramId = ProgramIdKey.KeyBytes,
+                Keys = keys,
+                Data = TokenProgramData.EncodeInitializeAccount2Data(authority)
+            };
+        }
+
+        /// <summary>
+        /// <para>Initializes an instruction to initialize a new account to hold tokens.</para>
+        /// <para>
+        /// This variant differs from <see cref="InitializeAccount"/> in that neither the owner nor the rent sysvar need to be passed as accounts.
+        /// </para>
+        /// </summary>
+        /// <param name="account">The public key of the account to initialize.</param>
+        /// <param name="mint">The public key of the token mint.</param>
+        /// <param name="authority">The public key of the account to set as authority of the initialized account.</param>
+        /// <returns>The transaction instruction.</returns>
+        public static TransactionInstruction InitializeAccount3(PublicKey account, PublicKey mint, PublicKey authority)
+        {
+            List<AccountMeta> keys = new()
+            {
+                AccountMeta.Writable(account, false),
+                AccountMeta.ReadOnly(mint, false)
+            };
+            return new TransactionInstruction
+            {
+                ProgramId = ProgramIdKey.KeyBytes,
+                Keys = keys,
+                Data = TokenProgramData.EncodeInitializeAccount3Data(authority)
+            };
+        }
+
+        /// <summary>
         /// Initializes an instruction to initialize a multi signature token account.
         /// </summary>
         /// <param name="multiSignature">Public key of the multi signature account.</param>
@@ -186,6 +237,35 @@ namespace Solnet.Programs
                 ProgramId = ProgramIdKey.KeyBytes,
                 Keys = keys,
                 Data = TokenProgramData.EncodeInitializeMintData(
+                    mintAuthority,
+                    freezeAuthority ?? new Account().PublicKey,
+                    decimals,
+                    freezeAuthorityOpt)
+            };
+        }
+
+        /// <summary>
+        /// Initializes an instruction to initialize a new token mint without requiring the rent sysvar account.
+        /// </summary>
+        /// <param name="mint">The public key of the token mint.</param>
+        /// <param name="decimals">The token decimals.</param>
+        /// <param name="mintAuthority">The public key of the token mint authority.</param>
+        /// <param name="freezeAuthority">The token freeze authority.</param>
+        /// <returns>The transaction instruction.</returns>
+        public static TransactionInstruction InitializeMint2(PublicKey mint, int decimals, PublicKey mintAuthority,
+            PublicKey freezeAuthority = null)
+        {
+            List<AccountMeta> keys = new()
+            {
+                AccountMeta.Writable(mint, false)
+            };
+
+            int freezeAuthorityOpt = freezeAuthority != null ? 1 : 0;
+            return new TransactionInstruction
+            {
+                ProgramId = ProgramIdKey.KeyBytes,
+                Keys = keys,
+                Data = TokenProgramData.EncodeInitializeMint2Data(
                     mintAuthority,
                     freezeAuthority ?? new Account().PublicKey,
                     decimals,
@@ -654,6 +734,12 @@ namespace Solnet.Programs
                     break;
                 case TokenProgramInstructions.Values.UiAmountToAmount:
                     TokenProgramData.DecodeUiAmountToAmount(decodedInstruction, data, keys, keyIndices);
+                    break;
+                case TokenProgramInstructions.Values.InitializeMintCloseAuthority:
+                    TokenProgramData.DecodeInitializeMintCloseAuthority(decodedInstruction, data, keys, keyIndices);
+                    break;
+                case TokenProgramInstructions.Values.Reallocate:
+                    TokenProgramData.DecodeReallocate(decodedInstruction, data, keys, keyIndices);
                     break;
             }
             return decodedInstruction;
